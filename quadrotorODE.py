@@ -70,9 +70,8 @@ class Rotordynamics(om.ExplicitComponent):
        n4 = inputs['n4']
        
        outputs['F_z'] = k_t *(n1**2 + n2**2 + n3**2 + n4**2)
-       outputs['tau_x'] = (k_t*np.sqrt(1/2)*l_arm+k_roll) * n1**2 + \
-           -(k_t*np.sqrt(1/2)*l_arm+k_roll) * n2**2 + \
-        -(k_t*np.sqrt(1/2)*l_arm+k_roll) * n3**2 + (k_t*np.sqrt(1/2)*l_arm+k_roll) * n4**2
+       outputs['tau_x'] = (k_t*np.sqrt(1/2)*l_arm+k_roll) * \
+           (n1**2 - n2**2 - n3**2 + n4**2)
        outputs['tau_y'] = (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n1**2 + \
        (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n2**2 -  (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n3**2 \
            -(k_t*np.sqrt(1/2)*l_arm+k_pitch) * n4**2
@@ -175,6 +174,10 @@ class Flightdynamics(om.ExplicitComponent):
         # partials
         partial_range = np.arange(nn, dtype = int)
         
+        self.declare_partials('xdot', 'u', rows = partial_range, cols = partial_range)
+        self.declare_partials('ydot', 'v', rows = partial_range, cols = partial_range)
+        self.declare_partials('zdot', 'w', rows = partial_range, cols = partial_range)
+        
         self.declare_partials('udot','F_z', rows = partial_range, cols = partial_range)
         self.declare_partials('udot','phi', rows = partial_range, cols = partial_range)
         self.declare_partials('udot','theta', rows = partial_range, cols = partial_range)
@@ -232,26 +235,32 @@ class Flightdynamics(om.ExplicitComponent):
         p,q,r = inputs['p'], inputs['q'], inputs['r']
         phi, theta, psi = inputs['phi'], inputs['theta'], inputs['psi']
         F_z, tau_x, tau_y, tau_z = inputs['F_z'], inputs['tau_x'], inputs['tau_y'], inputs['tau_z']
-        s_phi, c_phi, s_theta, c_theta = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta)
+        s_phi = np.sin(phi)
+        c_phi = np.cos(phi)
+        s_theta = np.sin(theta)
+        c_theta = np.cos(theta)
         s_psi, c_psi = np.sin(psi), np.cos(psi)
-        t_theta = s_theta/c_theta
+        t_theta = np.tan(theta)
         
         g_7 = -1/m * (s_phi*s_psi + c_phi*c_psi*s_theta)
-        g_8 = -1/m * (c_psi*s_phi - c_phi*s_psi*s_theta)
+        g_8 = -1/m * (c_phi*s_psi*s_theta - c_psi*s_phi)
         g_9 = -1/m *(c_phi*c_theta)
         
         outputs['xdot'] = u
         outputs['ydot'] = v
         outputs['zdot'] = w
-        outputs['psidot'] = q * s_phi/c_theta + r * c_phi / c_theta
+        outputs['psidot'] = r * c_phi / c_theta + q*s_phi/c_theta
         outputs['thetadot'] = q * c_phi - r * s_phi
         outputs['phidot'] = p + q * s_phi * t_theta + r * c_phi * t_theta
         outputs['udot'] = g_7 * F_z
         outputs['vdot'] = g_8 * F_z
         outputs['wdot'] = g + g_9 * F_z
+        outputs['udot'] = g_7 * F_z
+        outputs['vdot'] = g_8 * F_z
+        outputs['wdot'] = g + g_9 * F_z
         outputs['pdot'] = (I_y - I_z)/I_x * q * r + 1/I_x * tau_x
         outputs['qdot'] = (I_z - I_x)/I_y * p * r + 1/I_y * tau_y
-        outputs['rdot'] = (I_x - I_y)/I_z * p * q + 1/I_y * tau_z
+        outputs['rdot'] = (I_x - I_y)/I_z * p * q + 1/I_z * tau_z
         
         
     def compute_partials(self, inputs, J):
@@ -269,25 +278,31 @@ class Flightdynamics(om.ExplicitComponent):
         p,q,r = inputs['p'], inputs['q'], inputs['r']
         phi, theta, psi = inputs['phi'], inputs['theta'], inputs['psi']
         F_z, tau_x, tau_y, tau_z = inputs['F_z'], inputs['tau_x'], inputs['tau_y'], inputs['tau_z']
-        s_phi, c_phi, s_theta, c_theta = np.sin(phi), np.cos(phi), np.sin(theta), np.cos(theta)
+        s_phi = np.sin(phi)
+        c_phi = np.cos(phi)
+        s_theta = np.sin(theta)
+        c_theta = np.cos(theta)
         s_psi, c_psi = np.sin(psi), np.cos(psi)
-        t_theta = s_theta/c_theta
+        t_theta = np.tan(theta)
         
         g_7 = -1/m * (s_phi*s_psi + c_phi*c_psi*s_theta)
-        g_8 = -1/m * (c_psi*s_phi - c_phi*s_psi*s_theta)
+        g_8 = 1/m * (c_psi*s_phi - c_phi*s_psi*s_theta)
         g_9 = -1/m *(c_phi*c_theta)
         
-        dg7_dphi = -(c_phi*s_psi - c_psi*s_phi*s_theta)/m
+        dg7_dphi = (c_psi*s_phi*s_theta - c_phi*s_psi)/m
         dg7_dtheta = -(c_phi*c_psi*c_theta)/m
         dg7_dpsi = -(c_psi*s_phi - c_phi*s_psi*s_theta)/m
         
-        dg8_dphi = -(c_phi * c_psi + s_phi *s_psi * s_theta)/m
-        dg8_dtheta = (c_phi*c_theta*s_psi)/m
-        dg8_dpsi = (s_phi*s_psi + c_phi*c_psi*s_theta)/m
+        dg8_dphi = (c_phi * c_psi + s_phi *s_psi * s_theta)/m
+        dg8_dtheta = -(c_phi*c_theta*s_psi)/m
+        dg8_dpsi = -(s_phi*s_psi + c_phi*c_psi*s_theta)/m
         
         dg9_dphi = (c_theta * s_phi)/m
         dg9_dtheta = (c_phi * s_theta)/m
 
+        J['xdot', 'u'] = 1
+        J['ydot', 'v'] = 1
+        J['zdot', 'w'] = 1
         
         J['udot', 'F_z'] = g_7
         J['udot', 'phi'] = dg7_dphi * F_z

@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 p = om.Problem(model=om.Group())
 
 p.driver = om.ScipyOptimizeDriver()
-p.driver.options['optimizer'] = 'BFGS'
+#p.driver = om.pyOptSparseDriver()
+p.driver.options['optimizer'] = 'SLSQP'
 p.driver.declare_coloring()
 
 # p.driver = om.pyOptSparseDriver()
@@ -126,10 +127,10 @@ p.set_val('traj.phase0.states:r', phase.interp('r', [0, 0]), units = 'rad/s')
 # p.set_val('traj.phase0.controls:tau_y', phase.interp('tau_y', ys=[0, -6]), units='N*m')
 # p.set_val('traj.phase0.controls:tau_z', phase.interp('tau_z', ys=[0, 0.8]), units='N*m')
 
-p.set_val('traj.phase0.controls:n1', phase.interp('n1', ys=[250, 400]), units='1/s')
-p.set_val('traj.phase0.controls:n2', phase.interp('n2', ys=[250, 400]), units='1/s')
-p.set_val('traj.phase0.controls:n3', phase.interp('n3', ys=[250, 400]), units='1/s')
-p.set_val('traj.phase0.controls:n4', phase.interp('n4', ys=[250, 400]), units='1/s')
+p.set_val('traj.phase0.controls:n1', phase.interp('n1', ys=[250, 250]), units='1/s')
+p.set_val('traj.phase0.controls:n2', phase.interp('n2', ys=[250, 250]), units='1/s')
+p.set_val('traj.phase0.controls:n3', phase.interp('n3', ys=[250, 250]), units='1/s')
+p.set_val('traj.phase0.controls:n4', phase.interp('n4', ys=[250, 250]), units='1/s')
 
 # Run the driver
 dm.run_problem(p, simulate=True)
