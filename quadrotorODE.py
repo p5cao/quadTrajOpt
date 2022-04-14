@@ -75,7 +75,7 @@ class Rotordynamics(om.ExplicitComponent):
        outputs['tau_y'] = (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n1**2 + \
        (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n2**2 -  (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n3**2 \
            -(k_t*np.sqrt(1/2)*l_arm+k_pitch) * n4**2
-       outputs['tau_z'] = k_yaw * n1**2 - k_yaw * n2**2 + k_yaw * n3**2 + k_yaw * n4**2
+       outputs['tau_z'] = k_yaw * n1**2 - k_yaw * n2**2 + k_yaw * n3**2 - k_yaw * n4**2
        
     def compute_partials(self, inputs, J):
        C_t = .0409
@@ -249,7 +249,7 @@ class Flightdynamics(om.ExplicitComponent):
         outputs['xdot'] = u
         outputs['ydot'] = v
         outputs['zdot'] = w
-        outputs['psidot'] = r * c_phi / c_theta + q*s_phi/c_theta
+        outputs['psidot'] = q*s_phi/c_theta + r * c_phi / c_theta
         outputs['thetadot'] = q * c_phi - r * s_phi
         outputs['phidot'] = p + q * s_phi * t_theta + r * c_phi * t_theta
         outputs['udot'] = g_7 * F_z
