@@ -2,7 +2,7 @@ import openmdao.api as om
 import dymos as dm
 import numpy as np
 
-from quadrotorODE_dynamicInflow import QuadrotorODE
+from quadrotorODE import QuadrotorODE
 from dymos.examples.plotting import plot_results
 import matplotlib.pyplot as plt
 from dymos.utils.testing_utils import assert_check_partials
@@ -10,8 +10,8 @@ from scipy.io import savemat
 
 # Instantiate the problem, add the driver, and allow it to use coloring
 p = om.Problem(model=om.Group())
-p.driver = om.ScipyOptimizeDriver()
-#p.driver = om.pyOptSparseDriver()
+#p.driver = om.ScipyOptimizeDriver()
+p.driver = om.pyOptSparseDriver()
 p.driver.declare_coloring()
 p.driver.options['optimizer'] = 'SLSQP'
 
@@ -21,7 +21,7 @@ p.driver.options['optimizer'] = 'SLSQP'
 traj = dm.Trajectory()
 
 phase = dm.Phase(ode_class=QuadrotorODE,
-                 transcription=dm.GaussLobatto(num_segments=15, compressed=False))
+                 transcription=dm.Radau(num_segments=10, order = 3, compressed = True))
 
 
 traj.add_phase('phase0', phase)
@@ -67,22 +67,24 @@ phase.add_state('q', fix_initial=True, fix_final=False, units='rad/s', rate_sour
 phase.add_state('r', fix_initial=True, fix_final=False, units='rad/s', rate_source='rdot',
                 lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
 
-# inflow states
-phase.add_state('nu0_1', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_1_dot')
-phase.add_state('nuc_1', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_1_dot')
-phase.add_state('nus_1', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_1_dot')
+phase.add_state('J', fix_initial=True, fix_final=False)
 
-phase.add_state('nu0_2', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_2_dot')
-phase.add_state('nuc_2', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_2_dot')
-phase.add_state('nus_2', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_2_dot')
+# # inflow states
+# phase.add_state('nu0_1', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_1_dot')
+# phase.add_state('nuc_1', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_1_dot')
+# phase.add_state('nus_1', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_1_dot')
 
-phase.add_state('nu0_3', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_3_dot')
-phase.add_state('nuc_3', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_3_dot')
-phase.add_state('nus_3', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_3_dot')
+# phase.add_state('nu0_2', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_2_dot')
+# phase.add_state('nuc_2', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_2_dot')
+# phase.add_state('nus_2', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_2_dot')
 
-phase.add_state('nu0_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_4_dot')
-phase.add_state('nuc_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_4_dot')
-phase.add_state('nus_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_4_dot')
+# phase.add_state('nu0_3', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_3_dot')
+# phase.add_state('nuc_3', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_3_dot')
+# phase.add_state('nus_3', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_3_dot')
+
+# phase.add_state('nu0_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nu0_4_dot')
+# phase.add_state('nuc_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nuc_4_dot')
+# phase.add_state('nus_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_4_dot')
 
 # add controls
 phase.add_control('n1', units = '1/s', opt=True, lower = 200.0, upper = 400.0,
@@ -104,12 +106,16 @@ phase.add_control('n4', units = '1/s', opt=True, lower = 200.0, upper = 400.0,
 #                   rate_continuity=True)
 # add outputs
 
-# phase.add_timeseries_output('x', shape=(1,))
-# phase.add_timeseries_output('y', shape=(1,))
-# phase.add_timeseries_output('z', shape=(1,))
-# phase.add_timeseries_output('psi', shape=(1,))
+phase.add_timeseries_output('F_z', shape=(1,))
+phase.add_timeseries_output('tau_x', shape=(1,))
+phase.add_timeseries_output('tau_y', shape=(1,))
+phase.add_timeseries_output('tau_z', shape=(1,))
 
-phase.add_objective('time',  loc='final', ref=1.0)
+'''minimum time'''
+# phase.add_objective('time',  loc='final', ref=1.0)
+
+'''minimum energy/ mechanical power'''
+phase.add_objective('J', loc = 'final', ref = 1.0)
 
 # phase.add_boundary_constraint('x', loc='final', equals=9.9932)
 # phase.add_boundary_constraint('y', loc='final', equals=-0.2189)
@@ -125,7 +131,7 @@ phase.add_boundary_constraint('n2', loc = 'initial', equals = 250.0)
 phase.add_boundary_constraint('n3', loc = 'initial', equals = 250.0)
 phase.add_boundary_constraint('n4', loc = 'initial', equals = 250.0)
 
-p.model.linear_solver = om.DirectSolver()
+# p.model.linear_solver = om.DirectSolver()
 
 p.setup(check=True)
 
@@ -148,7 +154,7 @@ p.set_val('traj.phase0.states:psi', phase.interp('psi', [0.0, -0.3156]), units =
 p.set_val('traj.phase0.states:p', phase.interp('p', [0.0, 0.0]), units = 'rad/s')
 p.set_val('traj.phase0.states:q', phase.interp('q', [0.0, 0.0]), units = 'rad/s')
 p.set_val('traj.phase0.states:r', phase.interp('r', [0.0, 0.0]), units = 'rad/s')
-
+p.set_val('traj.phase0.states:J', phase.interp('J', ys=[0, 1]), units = '1/s**2')
 # p.set_val('traj.phase0.states:nu0_1', phase.interp('nu0_1',[0.0, 0.0]), units=None)
 # p.set_val('traj.phase0.states:nuc_1', phase.interp('nuc_1',[0.0, 0.0]), units=None)
 # p.set_val('traj.phase0.states:nus_1', phase.interp('nus_1',[0.0, 0.0]), units=None)
@@ -179,7 +185,7 @@ p.set_val('traj.phase0.controls:n4',phase.interp('n4', ys=[250.0, 250.0]), units
 p.run_model()
 cpd = p.check_partials(method='cs', compact_print=True)
 # cpd = p.check_partials(compact_print=False, out_stream=None)
-assert_check_partials(cpd, atol=1.0E-5, rtol=1.0E-4)
+# assert_check_partials(cpd, atol=1.0E-5, rtol=1.0E-4)
 
 
 # simulate the system without controls
@@ -190,6 +196,7 @@ dm.run_problem(p, simulate=True)
 
 #sim_out = traj.simulate(times_per_seg=50)
 t_sol = p.get_val('traj.phase0.timeseries.time')
+J = p.get_val('traj.phase0.timeseries.states:J')
 #t_sim = sim_out.get_val('traj.phase0.timeseries.time')
 
 # states =['x', 'y', 'z', 'psi']
@@ -282,9 +289,9 @@ plt.show()
 plot_results([('traj.phase0.timeseries.time', 'traj.phase0.timeseries.states:psi',
   'time (s)', 'yaw (rad)'),
               ('traj.phase0.timeseries.time', 'traj.phase0.timeseries.states:theta',
-                              'time (s)', 'pitch (m/s)'),
+                              'time (s)', 'pitch (rad)'),
               ('traj.phase0.timeseries.time', 'traj.phase0.timeseries.states:phi',
-                              'time (s)', 'roll (m/s)')],              
+                              'time (s)', 'roll (rad)')],              
               title='Quadrotor attitude states', 
               p_sol=sol, p_sim = sim)
 

@@ -9,8 +9,8 @@ from dymos.utils.testing_utils import assert_check_partials
 
 # Instantiate the problem, add the driver, and allow it to use coloring
 p = om.Problem(model=om.Group())
-p.driver = om.ScipyOptimizeDriver()
-#p.driver = om.pyOptSparseDriver()
+#p.driver = om.ScipyOptimizeDriver()
+p.driver = om.pyOptSparseDriver()
 p.driver.declare_coloring()
 p.driver.options['optimizer'] = 'SLSQP'
 

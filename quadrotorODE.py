@@ -26,6 +26,9 @@ class Rotordynamics(om.ExplicitComponent):
        self.add_output('tau_z', val = np.ones(nn), desc = 'sum of yaw moments produced by 4 rotors',
                        units = 'N*m')
        
+       self.add_output('J_dot', val = np.ones(nn), desc = 'sum of 4 rotors mechanical power', units = '1/s**3',
+                       tags=['dymos.state_rate_source:J', 'dymos.state_units:1/s**2'])
+       
        partial_range = np.arange(nn, dtype = int)
        self.declare_partials('F_z', 'n1', rows=partial_range, cols=partial_range)
        self.declare_partials('F_z', 'n2', rows=partial_range, cols=partial_range)
@@ -46,7 +49,12 @@ class Rotordynamics(om.ExplicitComponent):
        self.declare_partials('tau_z', 'n2', rows=partial_range, cols=partial_range)
        self.declare_partials('tau_z', 'n3', rows=partial_range, cols=partial_range)
        self.declare_partials('tau_z', 'n4', rows=partial_range, cols=partial_range)
-
+       
+       self.declare_partials('J_dot', 'n1', rows=partial_range, cols=partial_range)
+       self.declare_partials('J_dot', 'n2', rows=partial_range, cols=partial_range)
+       self.declare_partials('J_dot', 'n3', rows=partial_range, cols=partial_range)
+       self.declare_partials('J_dot', 'n4', rows=partial_range, cols=partial_range)
+       
     def compute(self, inputs, outputs):
        C_t = .0409
        C_roll = 0
@@ -59,10 +67,14 @@ class Rotordynamics(om.ExplicitComponent):
        
        '''need work
         C_P ='''
+        
+       
        k_t =  C_t * rho * D**4
        k_yaw = C_t * rho * D**4 * 5.40e-8/3.65e-6 # empirical from paper
        k_pitch = C_pitch * rho * D**5
        k_roll = C_roll* rho * D**5
+       
+       K_P = k_yaw * 2*np.pi
        
        n1 = inputs['n1']
        n2 = inputs['n2']
@@ -76,6 +88,7 @@ class Rotordynamics(om.ExplicitComponent):
        (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n2**2 -  (k_t*np.sqrt(1/2)*l_arm+k_pitch) * n3**2 \
            -(k_t*np.sqrt(1/2)*l_arm+k_pitch) * n4**2
        outputs['tau_z'] = k_yaw * n1**2 - k_yaw * n2**2 + k_yaw * n3**2 - k_yaw * n4**2
+       outputs['J_dot'] = K_P * (n1**3 + n2**3 + n3**3 + n4**3)
        
     def compute_partials(self, inputs, J):
        C_t = .0409
@@ -93,6 +106,8 @@ class Rotordynamics(om.ExplicitComponent):
        k_yaw = C_t * rho * D**4 * 5.40e-8/3.65e-6 # empirical from paper
        k_pitch = C_pitch * rho * D**5
        k_roll = C_roll* rho * D**5
+       
+       K_P = k_yaw * 2*np.pi
        
        n1 = inputs['n1']
        n2 = inputs['n2']
@@ -119,6 +134,10 @@ class Rotordynamics(om.ExplicitComponent):
        J['tau_z', 'n3'] = 2 * k_yaw * n3
        J['tau_z', 'n4'] = -2 * k_yaw * n4
        
+       J['J_dot', 'n1'] = 3 * K_P * n1**2
+       J['J_dot', 'n2'] = 3 * K_P * n2**2
+       J['J_dot', 'n3'] = 3 * K_P * n3**2
+       J['J_dot', 'n4'] = 3 * K_P * n4**2
        
 class Flightdynamics(om.ExplicitComponent):
     
