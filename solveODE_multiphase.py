@@ -13,19 +13,7 @@ waypoints = loadmat('wps_from_path_planning.mat')['wps']
 
 # row number of waypoints
 num_of_wps = waypoints.shape[0]
-# Instantiate the problem, add the driver, and allow it to use coloring
-p = om.Problem(model=om.Group())
-p.driver = om.ScipyOptimizeDriver()
-#p.driver = om.pyOptSparseDriver()
-p.driver.declare_coloring()
-p.driver.options['optimizer'] = 'SLSQP'
-p.driver.options['maxiter']= 400
 
-
-# Instantiate a Dymos Trajectory and add it to the Problem model.
-# Instantiate the trajectory and phase
-traj = dm.Trajectory()
-p.model.add_subsystem('traj', traj)
 
 
 transcription = dm.Radau(num_segments=10, order = 3, compressed = True)
@@ -33,6 +21,19 @@ phase_dict ={}
 
 # for i in range(num_of_wps-1):
 for i in range(3):
+    # Instantiate the problem, add the driver, and allow it to use coloring
+    p = om.Problem(model=om.Group())
+    p.driver = om.ScipyOptimizeDriver()
+    #p.driver = om.pyOptSparseDriver()
+    p.driver.declare_coloring()
+    p.driver.options['optimizer'] = 'SLSQP'
+    p.driver.options['maxiter']= 400
+
+
+    # Instantiate a Dymos Trajectory and add it to the Problem model.
+    # Instantiate the trajectory and phase
+    traj = dm.Trajectory()
+    p.model.add_subsystem('traj', traj)
     phase_name = "phase{0}".format(i+1)
     traj_name = "traj_p{0}".format(i+1)
     phase_dict[i] = phase_name
@@ -233,7 +234,7 @@ for i in range(3):
 # p.set_val('traj.phase0.controls:tau_z', phase.interp('tau_z', ys=[0.0, 0.0]), units='N*m')
 
 p.run_model()
-cpd = p.check_partials(method='cs', compact_print=True)
+# cpd = p.check_partials(method='cs', compact_print=True)
 # cpd = p.check_partials(compact_print=False, out_stream=None)
 # assert_check_partials(cpd, atol=1.0E-5, rtol=1.0E-4)
 
