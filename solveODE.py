@@ -13,8 +13,8 @@ p = om.Problem(model=om.Group())
 #p.driver = om.ScipyOptimizeDriver()
 p.driver = om.pyOptSparseDriver()
 p.driver.declare_coloring()
-p.driver.options['optimizer'] = 'SLSQP'
-
+p.driver.options['optimizer'] = 'SNOPT'
+p.driver.opt_settings['Major feasibility tolerance'] = 1e-9
 
 # Instantiate a Dymos Trajectory and add it to the Problem model.
 # Instantiate the trajectory and phase
@@ -241,7 +241,12 @@ z = sim.get_val('traj.phase0.timeseries.states:z')
 psi = sim.get_val('traj.phase0.timeseries.states:psi')
 
 output_table = np.hstack((np.hstack((np.hstack((np.hstack((t_sim, x)), y)), z)), psi))
+xline, yline, zline = output_table[:,1], output_table[:,2],-output_table[:,3]
+# xline, yline, zline = x_array.flatten(), y_array.flatten(), -z_array.flatten()
 
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.plot3D(xline, yline, zline, 'gray')
 # mdic_out = {"output_table": output_table, "label": "output_table"}
 # savemat("output_table.mat", mdic_out)
                          

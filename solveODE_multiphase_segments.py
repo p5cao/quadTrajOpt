@@ -9,8 +9,9 @@ from dymos.utils.testing_utils import assert_check_partials
 from scipy.io import savemat, loadmat
 
 # load the waypoints
+# waypoints = loadmat('minsnaptraj_wps.mat')['minsnap_waypoints']
+# waypoints = waypoints[0::2,:]
 waypoints = loadmat('wps_from_path_planning.mat')['wps']
-
 # row number of waypoints
 num_of_wps = waypoints.shape[0]
 
@@ -18,13 +19,15 @@ num_of_wps = waypoints.shape[0]
 current_time = 0.0
 current_cost = 0.0
 time_array = np.array([0])
-transcription = dm.Radau(num_segments=10, order = 3, compressed = True)
+transcription = dm.Radau(num_segments=10, order = 3, compressed = False)
 phase_dict ={}
 
-x_array = np.array([waypoints[0][0]])
-y_array = np.array([waypoints[0][1]])
-z_array = np.array([-waypoints[0][2]])
-psi_array = np.array([waypoints[0][3]])
+i= 16
+
+x_array = np.array([waypoints[i][0]])
+y_array = np.array([waypoints[i][1]])
+z_array = np.array([-waypoints[i][2]])
+psi_array = np.array([waypoints[i][3]])
 
 n1_array = np.array([250.0])
 n2_array = np.array([250.0])
@@ -32,18 +35,31 @@ n3_array = np.array([250.0])
 n4_array = np.array([250.0])
 
 n1_0, n2_0, n3_0, n4_0 = n1_array[0], n2_array[0], n3_array[0], n4_array[0]
+u0, v0, w0 = 0, 0, 0
+phi0, theta0 = 0, 0
+
+
+x0, x1 = waypoints[i][0], waypoints[i+1][0]
+y0, y1 = waypoints[i][1], waypoints[i+1][1]
+z0, z1 = -waypoints[i][2], -waypoints[i+1][2]
+psi0, psi1 = waypoints[i][3], waypoints[i+1][3]
+
+#psi0 = 0
+p0, q0, r0 = 0, 0, 0
 input_table = np.zeros(5)
 
 # for i in range(num_of_wps-1):
-for i in range(23,num_of_wps-1):
+for i in range(16, num_of_wps-1):
+    
+    
     # Instantiate the problem, add the driver, and allow it to use coloring
     p = om.Problem(model=om.Group())
-    p.driver = om.ScipyOptimizeDriver()
-    #p.driver = om.pyOptSparseDriver()
+    
+    p.driver = om.pyOptSparseDriver()
     p.driver.declare_coloring()
-    p.driver.options['optimizer'] = 'SLSQP'
-    p.driver.options['maxiter']= 400
-
+    p.driver.options['optimizer'] = 'SNOPT'
+    #p.driver.opt_settings['Major feasibility tolerance'] = 1e-9
+    #p.driver.options['maxiter'] = 400 
 
     # Instantiate a Dymos Trajectory and add it to the Problem model.
     # Instantiate the trajectory and phase
@@ -57,47 +73,113 @@ for i in range(23,num_of_wps-1):
 
     
     phase = traj.add_phase(phase_name, globals()[phase_name])
-
-
+    # x0, x1 = waypoints[i][0], waypoints[i+1][0]
+    # y0, y1 = waypoints[i][1], waypoints[i+1][1]
+    # z0, z1 = -waypoints[i][2], -waypoints[i+1][2]
+    # psi0, psi1 = waypoints[i][3], waypoints[i+1][3]
+    
+    # if abs(x1-x0)>4.0:
+    #     ulimit = abs(x1-x0)/2.0
+    # elif abs(x1-x0)<=1.0:
+    #     ulimit = 1.0
+    # else:
+    ulimit = 3.0
+        
+    # if abs(y1-y0)>4.0:
+    #     vlimit = abs(y1-y0)/2.0
+    # elif abs(y1-y0)<=1.0:
+    #     vlimit =1.0
+    # else:
+    vlimit = 3.0
+    uref = ulimit*2/3
+    vref = vlimit*2/3
+    
+    
     # add states
-    phase.set_time_options(fix_initial=True, units='s', duration_ref0 = current_time, 
-                           duration_bounds=(.05, 10.0),duration_ref = current_time + 10.0)
+    if i == 0 :
+        phase.set_time_options(fix_initial=True, units='s', duration_ref0 = 0, 
+                                duration_bounds=(.5, 10.0),duration_ref =  6.0)
+    else:
+        phase.set_time_options(initial_bounds=(current_time-0.5, current_time+0.5), units='s', 
+                               duration_ref0 = 0, duration_bounds=(.5, 10.0), duration_ref = 6.0)
+    phase.add_state('x', fix_initial=True, fix_final=True, units='m', rate_source='xdot', 
+                    lower = -5.0, upper = 50, ref0 = 0.0, ref = 40.0)
     
-    phase.add_state('x', fix_initial=False, fix_final=True, units='m', rate_source='xdot', 
-                    lower = -2.0, upper = 36.0, ref0 = 0.0, ref = 20.0)
+    phase.add_state('y', fix_initial=True, fix_final=True, units='m', rate_source='ydot',
+                    lower = -18.0, upper = 15.0, ref0 = -15.0, ref = 15.0)
     
-    phase.add_state('y', fix_initial=False, fix_final=True, units='m', rate_source='ydot',
-                    lower = -18.0, upper = 14.0, ref0 = -10.0, ref = 10.0)
-    
-    phase.add_state('z', fix_initial=False, fix_final=True, units='m', rate_source='zdot',
-                    lower = -2.2, upper = 1.8, ref0 = -2.2, ref = 1.8)
-    
+    phase.add_state('z', fix_initial=True, fix_final=True, units='m', rate_source='zdot',
+                    lower = -2.2, upper = -1.8, ref0 = -2.2, ref = -1.8)
+
     phase.add_state('u', fix_initial=True, fix_final=False, units='m/s', rate_source='udot',
-                    lower = -5.0, upper = 5.0, ref0 = -3.0, ref = 3.0)
-    
+                    lower = -ulimit, upper = ulimit, ref0 = -uref, ref = uref)
+
     phase.add_state('v', fix_initial=True, fix_final=False, units='m/s', rate_source='vdot',
-                    lower = -4.0, upper = 4.0, ref0 = -3.0, ref = 3.0)
-    
+                    lower = -vlimit, upper = vlimit, ref0 = -vref, ref = vref)
+
     phase.add_state('w', fix_initial=True, fix_final=False, units='m/s', rate_source='wdot',
-                    lower = -1.0, upper = 1.0, ref0 = -1.0, ref = 1.0)
-    
+                    lower = -1.0, upper = 1.0, ref0 = -0.5, ref = 0.5)
+
     phase.add_state('phi', fix_initial=True, fix_final=False, units='rad', rate_source='phidot',
-                    lower = -1/3*np.pi, upper = 1/3*np.pi, ref0 = -1/6*np.pi, ref = 1/6*np.pi)
-    
+                    lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
+
     phase.add_state('theta', fix_initial=True, fix_final=False, units='rad', rate_source='thetadot',
-                    lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/6*np.pi, ref = 1/6*np.pi)
-    
-    phase.add_state('psi', fix_initial=False, fix_final=True, units='rad', rate_source='psidot',
-                    lower = -np.pi, upper = np.pi, ref0 = -np.pi/2, ref = np.pi/2)
-    
+                    lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
+
+    phase.add_state('psi', fix_initial=True, fix_final=False, units='rad', rate_source='psidot',
+                    lower = -np.pi+0.1, upper = np.pi-0.1, ref0 = -2/3*np.pi, ref = 2/3*np.pi)
+
     phase.add_state('p', fix_initial=True, fix_final=False, units='rad/s', rate_source='pdot',
-                    lower = -1/3*np.pi/2, upper = 1/3*np.pi/2, ref0 = -1/6*np.pi/2, ref = 1/6*np.pi/2)
+                    lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
     
     phase.add_state('q', fix_initial=True, fix_final=False, units='rad/s', rate_source='qdot',
                     lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
     
     phase.add_state('r', fix_initial=True, fix_final=False, units='rad/s', rate_source='rdot',
-                    lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
+                    lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
+
+    # if i == 0 :
+    #     phase.set_time_options(fix_initial=True, units='s', duration_ref0 = 0, 
+    #                            duration_bounds=(.05, 2.0),duration_ref =  1.0)
+    # else:
+    #     phase.set_time_options(initial_bounds=(current_time-0.5, current_time+0.5), units='s', duration_ref0 = 0, 
+    #                        duration_bounds=(.05, 2.0),duration_ref = 1.0)
+    # phase.add_state('x', fix_initial=True, fix_final=True, units='m', rate_source='xdot', 
+    #                 lower = -5.0, upper = 50, ref0 = 0.0, ref = 40.0)
+    
+    # phase.add_state('y', fix_initial=True, fix_final=True, units='m', rate_source='ydot',
+    #                 lower = -18.0, upper = 15.0, ref0 = -15.0, ref = 15.0)
+    
+    # phase.add_state('z', fix_initial=True, fix_final=True, units='m', rate_source='zdot',
+    #                 lower = -2.5, upper = -1.5, ref0 = -2.2, ref = -1.8)
+
+    # phase.add_state('u', fix_initial=True, fix_final=False, units='m/s', rate_source='udot',
+    #                 lower = -ulimit, upper = ulimit, ref0 = -uref, ref = uref)
+
+    # phase.add_state('v', fix_initial=True, fix_final=False, units='m/s', rate_source='vdot',
+    #                 lower = -vlimit, upper = vlimit, ref0 = -vref, ref = vref)
+
+    # phase.add_state('w', fix_initial=True, fix_final=False, units='m/s', rate_source='wdot',
+    #                 lower = -1.0, upper = 1.0, ref0 = -0.5, ref = 0.5)
+
+    # phase.add_state('phi', fix_initial=True, fix_final=False, units='rad', rate_source='phidot',
+    #                 lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
+
+    # phase.add_state('theta', fix_initial=True, fix_final=False, units='rad', rate_source='thetadot',
+    #                 lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
+
+    # phase.add_state('psi', fix_initial=True, fix_final=True, units='rad', rate_source='psidot',
+    #                 lower = -np.pi+0.1, upper = np.pi-0.1, ref0 = -2/3*np.pi, ref = 2/3*np.pi)
+
+    # phase.add_state('p', fix_initial=True, fix_final=False, units='rad/s', rate_source='pdot',
+    #                 lower = -1/3*np.pi/2, upper = 1/3*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
+    
+    # phase.add_state('q', fix_initial=True, fix_final=False, units='rad/s', rate_source='qdot',
+    #                 lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
+    
+    # phase.add_state('r', fix_initial=True, fix_final=False, units='rad/s', rate_source='rdot',
+    #                 lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
+
     
     phase.add_state('J', fix_initial=True, fix_final=False)
 
@@ -119,13 +201,13 @@ for i in range(23,num_of_wps-1):
     # phase.add_state('nus_4', fix_initial=False, fix_final=False, units=None, rate_source = 'nus_4_dot')
     
     # add controls
-    phase.add_control('n1', units = '1/s', opt=True, lower = 200.0, upper = 400.0,
+    phase.add_control('n1', units = '1/s', opt=True, lower = 150.0, upper = 450.0,
                        rate_continuity=True)
-    phase.add_control('n2', units = '1/s', opt=True, lower = 200.0, upper = 400.0,
+    phase.add_control('n2', units = '1/s', opt=True, lower = 150.0, upper = 450.0,
                        rate_continuity=True)
-    phase.add_control('n3', units = '1/s', opt=True, lower = 200.0, upper = 400.0,
+    phase.add_control('n3', units = '1/s', opt=True, lower = 150.0, upper = 450.0,
                        rate_continuity=True)
-    phase.add_control('n4', units = '1/s', opt=True, lower = 200.0, upper = 400.0,
+    phase.add_control('n4', units = '1/s', opt=True, lower = 150.0, upper = 450.0,
                        rate_continuity=True)
 
     # phase.add_control('F_z', units = 'N', opt=True, lower = 0, upper = 10,
@@ -149,35 +231,41 @@ for i in range(23,num_of_wps-1):
 
     
     
-    x0, x1 = waypoints[i][0], waypoints[i+1][0]
-    y0, y1 = waypoints[i][1], waypoints[i+1][1]
-    z0, z1 = -waypoints[i][2], -waypoints[i+1][2]
-    psi0, psi1 = waypoints[i][3], waypoints[i+1][3]
+    # x0, x1 = waypoints[i][0], waypoints[i+1][0]
+    # y0, y1 = waypoints[i][1], waypoints[i+1][1]
+    # z0, z1 = -waypoints[i][2], -waypoints[i+1][2]
+    # psi1 = waypoints[i+1][3]
     
     
-    # globals()[phase_name].add_boundary_constraint('x', loc='final', equals=x1)
-    # globals()[phase_name].add_boundary_constraint('y', loc='final', equals=y1)
-    # globals()[phase_name].add_boundary_constraint('z', loc='final', equals=z1)
-    #globals()[phase_name].add_boundary_constraint('psi', loc='final', equals=psi1)
+    
+    # phase.add_boundary_constraint('x', loc='final', equals=x1)
+    # phase.add_boundary_constraint('y', loc='final', equals=y1)
+    # phase.add_boundary_constraint('z', loc='final', equals=z1)
+    # phase.add_boundary_constraint('psi', loc='final', equals=psi1)
     # phase.add_boundary_constraint('F_z', loc = 'initial', equals = 6.762)
     # phase.add_boundary_constraint('tau_x', loc = 'initial', equals = 0.0)
     # phase.add_boundary_constraint('tau_y', loc = 'initial', equals = 0.0)
     # phase.add_boundary_constraint('tau_z', loc = 'initial', equals = 0.0)
     
     # if phase0 and phase 30, set all initial and final ns to 250, resp'ly
-    #if i == 0:
+    if i == 0:
         
-    phase.add_boundary_constraint('n1', loc = 'initial', equals = n1_0)
-    phase.add_boundary_constraint('n2', loc = 'initial', equals = n2_0)
-    phase.add_boundary_constraint('n3', loc = 'initial', equals = n3_0)
-    phase.add_boundary_constraint('n4', loc = 'initial', equals = n4_0)
+        phase.add_boundary_constraint('n1', loc = 'initial', equals = 250.0)
+        phase.add_boundary_constraint('n2', loc = 'initial', equals = 250.0)
+        phase.add_boundary_constraint('n3', loc = 'initial', equals = 250.0)
+        phase.add_boundary_constraint('n4', loc = 'initial', equals = 250.0)
         
-    phase.add_boundary_constraint('x', loc='initial', equals=x0)
-    phase.add_boundary_constraint('y', loc='initial', equals=y0)
-    phase.add_boundary_constraint('z', loc='initial', equals=z0)
-    phase.add_boundary_constraint('psi', loc='initial', equals=psi0)
+    # phase.add_boundary_constraint('x', loc='initial', equals=x0)
+    # phase.add_boundary_constraint('y', loc='initial', equals=y0)
+    # phase.add_boundary_constraint('z', loc='initial', equals=z0)
+    # phase.add_boundary_constraint('psi', loc='initial', equals=psi0)
+    # phase.add_boundary_constraint('u', loc='initial', equals=u0)
+    # phase.add_boundary_constraint('v', loc='initial', equals=v0)
+    # phase.add_boundary_constraint('w', loc='initial', equals=w0)
+    # phase.add_boundary_constraint('phi', loc='initial', equals=phi0)
+    # phase.add_boundary_constraint('theta', loc='initial', equals=theta0)
         # phase.add_objective('J', loc = 'final', ref = 1.0)
-    if i == 30:
+    if i == num_of_wps -1 :
     # if i == 2:
         phase.add_boundary_constraint('n1', loc = 'final', equals = 250.0)
         phase.add_boundary_constraint('n2', loc = 'final', equals = 250.0)
@@ -204,26 +292,34 @@ for i in range(23,num_of_wps-1):
     
     
     # phase_name = phase_dict[i]
-    x0, x1 = waypoints[i][0], waypoints[i+1][0]
-    y0, y1 = waypoints[i][1], waypoints[i+1][1]
-    z0, z1 = -waypoints[i][2], -waypoints[i+1][2]
-    psi0, psi1 = waypoints[i][3], waypoints[i+1][3]
+    if i != 16:
+        x0 = x_array[-1][0]
+        y0 = y_array[-1][0]
+        z0 = z_array[-1][0]
+        psi0 = psi_array[-1][0] 
+        psi0 = (psi0+ np.pi) % (2 * np.pi) - np.pi
+        x1 = waypoints[i+1][0]
+        y1 = waypoints[i+1][1]
+        z1 = -waypoints[i+1][2]
+        psi1 = waypoints[i+1][3]
+
+        
 
 
     p.set_val('traj.'+phase_name+'.states:x', phase.interp('x', [x0, x1]), units = 'm')
     p.set_val('traj.'+phase_name+'.states:y', phase.interp('y',[y0, y1]), units = 'm')
     p.set_val('traj.'+phase_name+'.states:z', phase.interp('z', [z0, z1]), units = 'm')
 
-    p.set_val('traj.'+phase_name+'.states:u', phase.interp('u', [0, 0]), units = 'm/s')
-    p.set_val('traj.'+phase_name+'.states:v', phase.interp('v', [0, 0]), units = 'm/s')
-    p.set_val('traj.'+phase_name+'.states:w', phase.interp('w', [0, 0]), units = 'm/s')
-    p.set_val('traj.'+phase_name+'.states:phi', phase.interp('phi', [0.0, 0.0]), units = 'rad')
-    p.set_val('traj.'+phase_name+'.states:theta', phase.interp('theta', [0.0, 0.0]), units = 'rad')
-    p.set_val('traj.'+phase_name+'.states:psi', phase.interp('psi', [psi0, psi1]), units = 'rad')
-    p.set_val('traj.'+phase_name+'.states:p', phase.interp('p', [0.0, 0.0]), units = 'rad/s')
-    p.set_val('traj.'+phase_name+'.states:q', phase.interp('q', [0.0, 0.0]), units = 'rad/s')
-    p.set_val('traj.'+phase_name+'.states:r', phase.interp('r', [0.0, 0.0]), units = 'rad/s')
-    p.set_val('traj.'+phase_name+'.states:J', phase.interp('J', ys=[0, 1]), units = '1/s**2')
+    p.set_val('traj.'+phase_name+'.states:u', phase.interp('u', [u0, 0]), units = 'm/s')
+    p.set_val('traj.'+phase_name+'.states:v', phase.interp('v', [v0, 0]), units = 'm/s')
+    p.set_val('traj.'+phase_name+'.states:w', phase.interp('w', [w0, 0]), units = 'm/s')
+    p.set_val('traj.'+phase_name+'.states:phi', phase.interp('phi', [phi0, 0.0]), units = 'rad')
+    p.set_val('traj.'+phase_name+'.states:theta', phase.interp('theta', [theta0, 0.0]), units = 'rad')
+    p.set_val('traj.'+phase_name+'.states:psi', phase.interp('psi', [psi0, 0]), units = 'rad')
+    p.set_val('traj.'+phase_name+'.states:p', phase.interp('p', [p0, 0.0]), units = 'rad/s')
+    p.set_val('traj.'+phase_name+'.states:q', phase.interp('q', [q0, 0.0]), units = 'rad/s')
+    p.set_val('traj.'+phase_name+'.states:r', phase.interp('r', [r0, 0.0]), units = 'rad/s')
+    p.set_val('traj.'+phase_name+'.states:J', phase.interp('J', ys=[0, 300]), units = '1/s**2')
     # p.set_val('traj.phase0.states:nu0_1', phase.interp('nu0_1',[0.0, 0.0]), units=None)
     # p.set_val('traj.phase0.states:nuc_1', phase.interp('nuc_1',[0.0, 0.0]), units=None)
     # p.set_val('traj.phase0.states:nus_1', phase.interp('nus_1',[0.0, 0.0]), units=None)
@@ -239,22 +335,22 @@ for i in range(23,num_of_wps-1):
     # p.set_val('traj.phase0.states:nu0_4', phase.interp('nu0_4',[0.0, 0.0]), units=None)
     # p.set_val('traj.phase0.states:nuc_4', phase.interp('nuc_4',[0.0, 0.0]), units=None)
     # p.set_val('traj.phase0.states:nus_4', phase.interp('nus_4',[0.0, 0.0]), units=None)
-    if i == 0:
-        p.set_val('traj.'+phase_name+'.controls:n1',phase.interp('n1', ys=[250.0, 250.0]), units='1/s') 
-        p.set_val('traj.'+phase_name+'.controls:n2',phase.interp('n2', ys=[250.0, 250.0]), units='1/s') 
-        p.set_val('traj.'+phase_name+'.controls:n3',phase.interp('n3', ys=[250.0, 250.0]), units='1/s') 
-        p.set_val('traj.'+phase_name+'.controls:n4',phase.interp('n4', ys=[250.0, 250.0]), units='1/s') 
-    else:
-        p.set_val('traj.'+phase_name+'.controls:n1',phase.interp('n1', ys=[n1_0, 250.0]), units='1/s') 
-        p.set_val('traj.'+phase_name+'.controls:n2',phase.interp('n2', ys=[n2_0, 250.0]), units='1/s') 
-        p.set_val('traj.'+phase_name+'.controls:n3',phase.interp('n3', ys=[n3_0, 250.0]), units='1/s') 
-        p.set_val('traj.'+phase_name+'.controls:n4',phase.interp('n4', ys=[n4_0, 250.0]), units='1/s') 
+    # if i == 0:
+    p.set_val('traj.'+phase_name+'.controls:n1',phase.interp('n1', ys=[250.0, 250.0]), units='1/s') 
+    p.set_val('traj.'+phase_name+'.controls:n2',phase.interp('n2', ys=[250.0, 250.0]), units='1/s') 
+    p.set_val('traj.'+phase_name+'.controls:n3',phase.interp('n3', ys=[250.0, 250.0]), units='1/s') 
+    p.set_val('traj.'+phase_name+'.controls:n4',phase.interp('n4', ys=[250.0, 250.0]), units='1/s') 
+    # else:
+    #     p.set_val('traj.'+phase_name+'.controls:n1',phase.interp('n1', ys=[n1_0, 250.0]), units='1/s') 
+    #     p.set_val('traj.'+phase_name+'.controls:n2',phase.interp('n2', ys=[n2_0, 250.0]), units='1/s') 
+    #     p.set_val('traj.'+phase_name+'.controls:n3',phase.interp('n3', ys=[n3_0, 250.0]), units='1/s') 
+    #     p.set_val('traj.'+phase_name+'.controls:n4',phase.interp('n4', ys=[n4_0, 250.0]), units='1/s') 
     
     p.run_model()
     # cpd = p.check_partials(method='cs', compact_print=True)
     # cpd = p.check_partials(compact_print=False, out_stream=None)
     # assert_check_partials(cpd, atol=1.0E-5, rtol=1.0E-4)
-    
+    #cpd = p.check_partials(method='cs', compact_print=True)
     
     # simulate the system without controls
     
@@ -265,8 +361,7 @@ for i in range(23,num_of_wps-1):
     #sim_out = traj.simulate(times_per_seg=50)
     t_sol = p.get_val('traj.'+phase_name+'.timeseries.time')
     J = p.get_val('traj.'+phase_name+'.timeseries.states:J')
-    current_time = t_sol[-1][0]
-    current_cost = current_cost + J[-1][0]
+    
     
 
 
@@ -289,7 +384,18 @@ for i in range(23,num_of_wps-1):
     x = sim.get_val('traj.'+phase_name+'.timeseries.states:x')
     y = sim.get_val('traj.'+phase_name+'.timeseries.states:y')
     z = sim.get_val('traj.'+phase_name+'.timeseries.states:z')
+    u = sim.get_val('traj.'+phase_name+'.timeseries.states:u')
+    v = sim.get_val('traj.'+phase_name+'.timeseries.states:v')
+    w = sim.get_val('traj.'+phase_name+'.timeseries.states:w')
     psi = sim.get_val('traj.'+phase_name+'.timeseries.states:psi')
+    theta = sim.get_val('traj.'+phase_name+'.timeseries.states:theta')
+    phi = sim.get_val('traj.'+phase_name+'.timeseries.states:phi')
+    p = sim.get_val('traj.'+phase_name+'.timeseries.states:p')
+    q = sim.get_val('traj.'+phase_name+'.timeseries.states:q')
+    r = sim.get_val('traj.'+phase_name+'.timeseries.states:r')
+    
+    current_time = t_sim[-1][0]
+    current_cost = current_cost + J[-1][0]
     
     F_z = sim.get_val('traj.'+phase_name+'.timeseries.F_z')
     tau_x = sim.get_val('traj.'+phase_name+'.timeseries.tau_x')
@@ -314,17 +420,42 @@ for i in range(23,num_of_wps-1):
     n3_0 = n3[-1][0]
     n4_0 = n4[-1][0]  
     
+    x0 = x[-1][0]
+    y0 = y[-1][0]
+    z0 = z[-1][0]
+    u0 = u[-1][0]
+    v0 = v[-1][0]
+    w0 = w[-1][0]
+    theta0 = theta[-1][0]
+    phi0 = phi[-1][0]
+    psi0 = psi[-1][0] 
+    p0 = p[-1][0]
+    q0 = q[-1][0]
+    r0 = r[-1][0]
+    
+    # theta0 = (theta0+ np.pi) % (2 * np.pi) - np.pi
+    # phi0 = (phi0+ np.pi) % (2 * np.pi) - np.pi
+    # psi0 = (psi0+ np.pi) % (2 * np.pi) - np.pi
+    
     n1_array = np.vstack((n1_array, n1))
     n2_array = np.vstack((n2_array, n2))
     n3_array = np.vstack((n3_array, n3))
     n4_array = np.vstack((n4_array, n4))
+    
+    error = np.linalg.norm([x0 - x1, y0 - y1])
+    print("norm of difference = "+str(error) )
+    if error > 10.0:
+        print("optimization failed at "+phase_name)
+        current_cost = current_cost - J[-1][0]
+        current_time = current_time - (t_sim[-1][0] - t_sim[0][0])
+        break
 
 output_table = np.hstack((np.hstack((np.hstack((np.hstack((time_array, x_array)), y_array)), z_array)), psi_array))
 output_table = np.delete(output_table, 0, 0)
 # output_3to7 = np.hstack((np.hstack((np.hstack((np.hstack((time_array, x_array)), y_array)), z_array)), psi_array))
 
-mdic_out = {"output_all": output_table, "label": "output_table"}
-savemat("output_table_all.mat", mdic_out)
+# mdic_out = {"output_all": output_table, "label": "output_table"}
+# savemat("output_table_16to29.mat", mdic_out)
 xline, yline, zline = output_table[:,1], output_table[:,2],-output_table[:,3]
 # xline, yline, zline = x_array.flatten(), y_array.flatten(), -z_array.flatten()
 
