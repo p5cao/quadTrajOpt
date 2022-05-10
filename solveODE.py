@@ -21,7 +21,7 @@ p.driver.opt_settings['Major feasibility tolerance'] = 1e-9
 traj = dm.Trajectory()
 
 phase = dm.Phase(ode_class=QuadrotorODE,
-                 transcription=dm.Radau(num_segments=10, order = 3, compressed = True))
+                 transcription=dm.Radau(num_segments=10, order = 3, compressed = False))
 
 
 traj.add_phase('phase0', phase)
@@ -29,7 +29,7 @@ traj.add_phase('phase0', phase)
 p.model.add_subsystem('traj', traj)
 
 # add states
-phase.set_time_options(fix_initial=True, units='s', duration_bounds=(.05, 10.0),duration_ref0 = 0.0, duration_ref=10.0)
+phase.set_time_options(fix_initial=True, units='s', duration_bounds=(.05, 10.0),duration_ref0 = 0.0, duration_ref=5.0)
 
 phase.add_state('x', fix_initial=True, fix_final=True, units='m', rate_source='xdot', 
                 lower = -5.0, upper = 40.0, ref0 = 0.0, ref = 20.0)
@@ -38,13 +38,13 @@ phase.add_state('y', fix_initial=True, fix_final=True, units='m', rate_source='y
                 lower = -20.0, upper = 15.0, ref0 = -2.0, ref = 1.0)
 
 phase.add_state('z', fix_initial=True, fix_final=True, units='m', rate_source='zdot',
-                lower = -4.0, upper = 0.0, ref0 = -2.0, ref = 1.0)
+                lower = -2.2, upper = 0.0, ref0 = -2.0, ref = 1.0)
 
 phase.add_state('u', fix_initial=True, fix_final=False, units='m/s', rate_source='udot',
-                lower = -1.0, upper = 5.0, ref0 = 0.0, ref = 4.0)
+                lower = -5.0, upper = 5.0, ref0 = -3.0, ref = 3.0)
 
 phase.add_state('v', fix_initial=True, fix_final=False, units='m/s', rate_source='vdot',
-                lower = -3.0, upper = 3.0, ref0 = -1.0, ref = 1.0)
+                lower = -5.0, upper = 5.0, ref0 = -3.0, ref = 3.0)
 
 phase.add_state('w', fix_initial=True, fix_final=False, units='m/s', rate_source='wdot',
                 lower = -1.0, upper = 1.0, ref0 = -0.2, ref = 0.2)
@@ -112,7 +112,7 @@ phase.add_timeseries_output('tau_y', shape=(1,))
 phase.add_timeseries_output('tau_z', shape=(1,))
 
 '''minimum time'''
-# phase.add_objective('time',  loc='final', ref=1.0)
+#phase.add_objective('time',  loc='final', ref=1.0)
 
 '''minimum energy/ mechanical power'''
 phase.add_objective('J', loc = 'final', ref = 1.0)
@@ -141,16 +141,16 @@ p.set_val('traj.phase0.t_initial', 0.0, units='s')
 p.set_val('traj.phase0.t_duration', 10.0, units='s')
 
 
-p.set_val('traj.phase0.states:x', phase.interp('x', [0.0, 9.9688]), units = 'm')
-p.set_val('traj.phase0.states:y', phase.interp('y', [0.0, -0.6902]), units = 'm')
-p.set_val('traj.phase0.states:z', phase.interp('z', [-2.0, -1.733]), units = 'm')
+p.set_val('traj.phase0.states:x', phase.interp('x', [0.0, 34.0]), units = 'm')
+p.set_val('traj.phase0.states:y', phase.interp('y', [0.0, -5.0]), units = 'm')
+p.set_val('traj.phase0.states:z', phase.interp('z', [-2.0, -2.0]), units = 'm')
 
 p.set_val('traj.phase0.states:u', phase.interp('u', [0, 0]), units = 'm/s')
 p.set_val('traj.phase0.states:v', phase.interp('v', [0, 0]), units = 'm/s')
 p.set_val('traj.phase0.states:w', phase.interp('w', [0, 0]), units = 'm/s')
 p.set_val('traj.phase0.states:phi', phase.interp('phi', [0.0, 0.0]), units = 'rad')
 p.set_val('traj.phase0.states:theta', phase.interp('theta', [0.0, 0.0]), units = 'rad')
-p.set_val('traj.phase0.states:psi', phase.interp('psi', [0.0, -0.3156]), units = 'rad')
+p.set_val('traj.phase0.states:psi', phase.interp('psi', [0.0, 0]), units = 'rad')
 p.set_val('traj.phase0.states:p', phase.interp('p', [0.0, 0.0]), units = 'rad/s')
 p.set_val('traj.phase0.states:q', phase.interp('q', [0.0, 0.0]), units = 'rad/s')
 p.set_val('traj.phase0.states:r', phase.interp('r', [0.0, 0.0]), units = 'rad/s')
@@ -183,7 +183,7 @@ p.set_val('traj.phase0.controls:n4',phase.interp('n4', ys=[250.0, 250.0]), units
 # p.set_val('traj.phase0.controls:tau_z', phase.interp('tau_z', ys=[0.0, 0.0]), units='N*m')
 
 p.run_model()
-cpd = p.check_partials(method='cs', compact_print=True)
+# cpd = p.check_partials(method='cs', compact_print=True)
 # cpd = p.check_partials(compact_print=False, out_stream=None)
 # assert_check_partials(cpd, atol=1.0E-5, rtol=1.0E-4)
 

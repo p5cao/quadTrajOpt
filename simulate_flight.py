@@ -12,7 +12,7 @@ p = om.Problem(model=om.Group())
 #p.driver = om.ScipyOptimizeDriver()
 p.driver = om.pyOptSparseDriver()
 p.driver.declare_coloring()
-p.driver.options['optimizer'] = 'SLSQP'
+p.driver.options['optimizer'] = 'SNOPT'
 
 
 # Instantiate a Dymos Trajectory and add it to the Problem model.
@@ -20,7 +20,7 @@ p.driver.options['optimizer'] = 'SLSQP'
 traj = dm.Trajectory()
 
 phase = dm.Phase(ode_class=Flightdynamics,
-                 transcription=dm.GaussLobatto(num_segments=15, compressed=False))
+                 transcription=dm.Radau(num_segments=20, order = 3, compressed = False))
 
 
 traj.add_phase('phase0', phase)
@@ -28,25 +28,25 @@ traj.add_phase('phase0', phase)
 p.model.add_subsystem('traj', traj)
 
 # add states
-phase.set_time_options(fix_initial=True, units='s', duration_bounds=(.05, 10.0),duration_ref0 = 0.0, duration_ref=10.0)
+phase.set_time_options(fix_initial=True, units='s', duration_bounds=(.05, 10.0),duration_ref0 = 0.0, duration_ref=7.0)
 
 phase.add_state('x', fix_initial=True, fix_final=True, units='m', rate_source='xdot', 
-                lower = -5.0, upper = 40.0, ref0 = 0.0, ref = 20.0)
+                lower = -5.0, upper = 40.0, ref0 = 0.0, ref = 35.0)
 
 phase.add_state('y', fix_initial=True, fix_final=True, units='m', rate_source='ydot',
-                lower = -20.0, upper = 15.0, ref0 = -2.0, ref = 1.0)
+                lower = -20.0, upper = 15.0, ref0 = -5.0, ref = 1.0)
 
 phase.add_state('z', fix_initial=True, fix_final=True, units='m', rate_source='zdot',
-                lower = -4.0, upper = 0.0, ref0 = -2.0, ref = 1.0)
+                lower = -2.5, upper = -0.5, ref0 = -2.5, ref = -1.0)
 
 phase.add_state('u', fix_initial=True, fix_final=False, units='m/s', rate_source='udot',
-                lower = -1.0, upper = 5.0, ref0 = 0.0, ref = 4.0)
+                lower = -3.0, upper = 3.0, ref0 = -2.0, ref = 2.0)
 
 phase.add_state('v', fix_initial=True, fix_final=False, units='m/s', rate_source='vdot',
-                lower = -3.0, upper = 3.0, ref0 = -1.0, ref = 1.0)
+                lower = -3.0, upper = 3.0, ref0 = -0.5, ref = 0.5)
 
 phase.add_state('w', fix_initial=True, fix_final=False, units='m/s', rate_source='wdot',
-                lower = -1.0, upper = 1.0, ref0 = -0.2, ref = 0.2)
+                lower = -1.0, upper = 1.0, ref0 = -0.5, ref = 0.5)
 
 phase.add_state('phi', fix_initial=True, fix_final=False, units='rad', rate_source='phidot',
                 lower = -1/3*np.pi, upper = 1/3*np.pi, ref0 = -1/6*np.pi, ref = 1/6*np.pi)
@@ -58,7 +58,7 @@ phase.add_state('psi', fix_initial=True, fix_final=True, units='rad', rate_sourc
                 lower = -1/2*np.pi, upper = 1/2*np.pi, ref0 = -1/3*np.pi, ref = 1/3*np.pi)
 
 phase.add_state('p', fix_initial=True, fix_final=False, units='rad/s', rate_source='pdot',
-                lower = -1/3*np.pi/2, upper = 1/3*np.pi/2, ref0 = -1/6*np.pi/2, ref = 1/6*np.pi/2)
+                lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
 
 phase.add_state('q', fix_initial=True, fix_final=False, units='rad/s', rate_source='qdot',
                 lower = -1/2*np.pi/2, upper = 1/2*np.pi/2, ref0 = -1/3*np.pi/2, ref = 1/3*np.pi/2)
@@ -71,7 +71,7 @@ phase.add_control('F_z', units = 'N', opt=True, lower = 0, upper = 10,
                   rate_continuity=True)
 phase.add_control('tau_x', units = 'N*m', opt=True, lower =-1, upper = 1,
                   rate_continuity=True)
-phase.add_control('tau_y', units = 'N*m', opt=True, lower =-6, upper = 2,
+phase.add_control('tau_y', units = 'N*m', opt=True, lower =-1, upper = 1,
                   rate_continuity=True)
 phase.add_control('tau_z', units = 'N*m', opt=True, lower =-1, upper = 1, 
                   rate_continuity=True)
@@ -89,7 +89,7 @@ phase.add_objective('time',  loc='final', ref=1.0)
 # phase.add_boundary_constraint('z', loc='final', equals=-1.7839)
 # phase.add_boundary_constraint('psi', loc='final', equals=0.3609)
 
-p.model.linear_solver = om.DirectSolver()
+# p.model.linear_solver = om.DirectSolver()
 
 p.setup(check=True)
 
@@ -99,10 +99,10 @@ p.set_val('traj.phase0.t_initial', 0.0, units='s')
 p.set_val('traj.phase0.t_duration', 10.0, units='s')
 
 
-p.set_val('traj.phase0.states:x', phase.interp('x', [0.0, 9.9688]), units = 'm')
-p.set_val('traj.phase0.states:y', phase.interp('y', [0.0, -0.6902]), units = 'm')
-p.set_val('traj.phase0.states:z', phase.interp('z', [-2.0, -1.733]), units = 'm')
-p.set_val('traj.phase0.states:psi', phase.interp('psi', [0.0, -0.3156]), units = 'rad')
+p.set_val('traj.phase0.states:x', phase.interp('x', [0.0, 34.0]), units = 'm')
+p.set_val('traj.phase0.states:y', phase.interp('y', [0.0, -5.0]), units = 'm')
+p.set_val('traj.phase0.states:z', phase.interp('z', [-2.0, -2.0]), units = 'm')
+p.set_val('traj.phase0.states:psi', phase.interp('psi', [0.0, 0.0]), units = 'rad')
 # p.set_val('traj.phase0.states:y', phase.interp('y', [0.0, -0.2189]), units = 'm')
 # p.set_val('traj.phase0.states:z', phase.interp('z', [-2.0, -1.7839]), units = 'm')
 p.set_val('traj.phase0.states:u', phase.interp('u', [0, 0]), units = 'm/s')
@@ -181,3 +181,20 @@ plot_results([('traj.phase0.timeseries.time', 'traj.phase0.timeseries.controls:F
 
 plt.show()
 
+time_array = sim.get_val('traj.phase0.timeseries.time')
+x_array = sim.get_val('traj.phase0.timeseries.states:x')
+y_array = sim.get_val('traj.phase0.timeseries.states:y')
+z_array = sim.get_val('traj.phase0.timeseries.states:z')
+psi_array = sim.get_val('traj.phase0.timeseries.states:psi')
+output_table = np.hstack((np.hstack((np.hstack((np.hstack((time_array, x_array)), y_array)), z_array)), psi_array))
+output_table = np.delete(output_table, 0, 0)
+# output_28to33 = output_table[0:601,:]
+
+# mdic_out = {"output_all": output_table, "label": "output_table"}
+# savemat("output_table_RVall.mat", mdic_out)
+xline, yline, zline = output_table[:,1], output_table[:,2],-output_table[:,3]
+# xline, yline, zline = x_array.flatten(), y_array.flatten(), -z_array.flatten()
+
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.plot3D(xline, yline, zline, 'gray')
